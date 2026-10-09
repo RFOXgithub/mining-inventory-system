@@ -8,3 +8,14 @@ coverage
 *.log
 prisma/*.db
 prisma/*.db-journal
+
+# Non-build files (AI tooling, planning, scratch)
+.agents/
+.claude/
+skills/
+skills-lock.json
+artifacts/
+planning/
+PROMPT.md
+tsconfig.tsbuildinfo
+.env*.local

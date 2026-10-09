@@ -2,7 +2,7 @@
 
 Industrial operations system for an Indonesian aggregate and stone-crushing business.
 
-## Current vertical slice
+## Fitur saat ini
 
 - Responsive industrial application shell and executive operations dashboard
 - Production monitoring with target, yield, downtime, and output composition
@@ -13,7 +13,7 @@ Industrial operations system for an Indonesian aggregate and stone-crushing busi
 - Normalized PostgreSQL/Prisma foundation for RBAC, master data, inventory ledger, production, sales/delivery, approvals, notifications, audit logs, and document sequences
 - Docker-ready PostgreSQL configuration
 
-## Local setup
+## Cara menjalankan (lokal)
 
 1. Copy `.env.example` to `.env` and replace `AUTH_SECRET`.
 2. Start PostgreSQL with `docker compose up -d`.
@@ -35,7 +35,7 @@ Industrial operations system for an Indonesian aggregate and stone-crushing busi
 
 The current UI uses realistic demonstration data while the database-backed repository layer, sessions, and remaining phased modules are completed. Do not treat the demo transaction response as production persistence.
 
-## Quality checks
+## Pengecekan kualitas
 
 ```sh
 npm run typecheck
@@ -43,7 +43,9 @@ npm run build
 npx prisma validate
 ```
 
-## Acc Test
+## Akun uji (hanya development)
 
-admin@quarryflow.co.id
-QuarryFlow2026!
+- Email: `admin@quarryflow.co.id`
+- Password: `QuarryFlow2026!`
+
+Ganti kredensial ini sebelum deploy ke production.
