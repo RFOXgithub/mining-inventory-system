@@ -1,0 +1,96 @@
+{
+  "label": "FICTIONAL FIXTURE ONLY; no company data or cut-over authorization",
+  "first": {
+    "environment": "STAGING",
+    "batchId": "ef936ccb-ab9e-41af-be93-99a6916ec9bc",
+    "cutoff": "2026-09-01T00:00:00Z",
+    "sourceHash": "43f44a4a1cf52b75a606ab17ee2ee84f96a055beb0bbd9cecab4caba6de6fdcd",
+    "sourceCount": 1,
+    "inputCount": 1,
+    "reconciledCount": 1,
+    "exceptions": [],
+    "readyForReview": true,
+    "promotionAuthorized": false,
+    "signoffRequired": [
+      "ADMIN_PC",
+      "ADMIN_FINANCE_DIFFERENT_ACCOUNT",
+      "MANAGER",
+      "CUT_OVER_OWNER"
+    ],
+    "rows": [
+      {
+        "lineage": "source/Stock/2",
+        "sourceSha256": "c53562d0cbda06233fb0c386a73d9647e3f403a1fe2a37facff9e59016cbce25",
+        "rawCells": {
+          "material": "Fixture material",
+          "quantity": "10",
+          "uom": "M3"
+        },
+        "mapping": {
+          "key": "Fixture material",
+          "plantId": "69986a54-f370-4ac3-b9ce-ae1491bdb7b6",
+          "itemId": "db7352fd-1474-4136-ab33-53e008c7a1eb",
+          "locationId": "502712ae-b502-4cdb-83ca-0dfa1242374a",
+          "uomId": "1c33f392-c761-4298-86c3-4fd8f0c14984",
+          "verifiedBy": "1b18d090-7674-4c63-91b7-452100bbeae0",
+          "evidence": "Fictional fixture evidence, not company settings"
+        },
+        "domain": "INVENTORY",
+        "mode": "NEW_OPENING",
+        "sourceQuantity": "10",
+        "ledgerQuantity": "0",
+        "delta": "10",
+        "uom": "S2-M3",
+        "requestKey": "596f770d-45e4-4ba1-a27b-45afe7eb5dba"
+      }
+    ],
+    "totals": [
+      {
+        "key": "69986a54-f370-4ac3-b9ce-ae1491bdb7b6:INVENTORY:S2-M3",
+        "uom": "S2-M3",
+        "source": "10",
+        "existing": "0",
+        "delta": "10",
+        "rows": 1
+      }
+    ],
+    "proposals": [
+      {
+        "requestKey": "596f770d-45e4-4ba1-a27b-45afe7eb5dba",
+        "kind": "OPENING",
+        "effectiveAt": "2026-09-01T00:00:00Z",
+        "sourceName": "source/Stock/2",
+        "checksum": "c53562d0cbda06233fb0c386a73d9647e3f403a1fe2a37facff9e59016cbce25",
+        "evidence": "ef936ccb-ab9e-41af-be93-99a6916ec9bc / source/Stock/2 / c53562d0cbda06233fb0c386a73d9647e3f403a1fe2a37facff9e59016cbce25",
+        "reason": "Staging proposal; memerlukan PC, Finance, Manager berbeda akun dan cut-over sign-off",
+        "lines": [
+          {
+            "itemId": "db7352fd-1474-4136-ab33-53e008c7a1eb",
+            "locationId": "502712ae-b502-4cdb-83ca-0dfa1242374a",
+            "quantity": "10"
+          }
+        ]
+      }
+    ]
+  },
+  "repeatedHash": "43f44a4a1cf52b75a606ab17ee2ee84f96a055beb0bbd9cecab4caba6de6fdcd",
+  "blockedDoubleOpening": [
+    {
+      "code": "DOUBLE_OPENING",
+      "lineage": "source/Stock/2",
+      "detail": "Ledger/opening/legacy sudah ada. Gunakan reconciliation bridge; opening Excel tambahan diblokir.",
+      "ownerId": "4daa38f1-8633-4a9c-a53b-d28485a178e1",
+      "critical": true
+    }
+  ],
+  "bridge": [
+    {
+      "key": "69986a54-f370-4ac3-b9ce-ae1491bdb7b6:INVENTORY:S2-M3",
+      "uom": "S2-M3",
+      "source": "10",
+      "existing": "10",
+      "delta": "0",
+      "rows": 1
+    }
+  ]
+}

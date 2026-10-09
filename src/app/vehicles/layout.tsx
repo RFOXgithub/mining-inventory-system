@@ -1,0 +1,1 @@
+import{notFound}from"next/navigation";import{requirePermission}from"@/lib/auth";export default async function Layout({children}:{children:React.ReactNode}){const a=await requirePermission("delivery.manage");if(!a.ok)notFound();return children}

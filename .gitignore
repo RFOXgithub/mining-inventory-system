@@ -1,0 +1,10 @@
+node_modules
+.next
+.env
+.env.local
+.quarryflow-dev/
+dist
+coverage
+*.log
+prisma/*.db
+prisma/*.db-journal

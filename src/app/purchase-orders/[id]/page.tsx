@@ -1,0 +1,1 @@
+import{OperationsDetail}from"@/components/operations-detail";export default async function Page({params}:{params:Promise<{id:string}>}){return <OperationsDetail kind="purchase-orders" id={(await params).id}/>}

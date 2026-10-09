@@ -1,0 +1,2 @@
+export function pageParams(request: Request) { const u=new URL(request.url),page=Math.max(1,Number(u.searchParams.get("page"))||1),pageSize=Math.min(50,Math.max(5,Number(u.searchParams.get("pageSize"))||10));return{u,page,pageSize,skip:(page-1)*pageSize}; }
+export function serialize<T>(value:T):T{return JSON.parse(JSON.stringify(value,(_key,item)=>typeof item==="bigint"?Number(item):item&&typeof item==="object"&&item.constructor?.name==="Decimal"?Number(item):item))}

@@ -1,0 +1,3 @@
+import { z } from "zod";
+export const weighbridgeSchema = z.object({ transactionType:z.enum(["INCOMING","OUTGOING"]), vehicleId:z.string().uuid(), driverId:z.string().uuid(), partyType:z.enum(["CUSTOMER","SUPPLIER","QUARRY"]), partyId:z.string().uuid(), itemType:z.enum(["PRODUCT","MATERIAL"]), itemId:z.string().uuid(), grossWeight:z.number().positive(), tareWeight:z.number().nonnegative(), notes:z.string().max(500).optional() }).superRefine((v,ctx)=>{if(v.tareWeight>=v.grossWeight)ctx.addIssue({code:"custom",path:["tareWeight"],message:"Berat tara harus lebih kecil dari berat bruto"})});
+export type WeighbridgeInput=z.infer<typeof weighbridgeSchema>;

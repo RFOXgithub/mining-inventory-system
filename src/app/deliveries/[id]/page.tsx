@@ -1,0 +1,1 @@
+import{EnterpriseDetail}from"@/components/enterprise-detail";export default async function Page({params}:{params:Promise<{id:string}>}){return <EnterpriseDetail kind="deliveries" id={(await params).id}/>}

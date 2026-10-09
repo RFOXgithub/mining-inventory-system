@@ -1,0 +1,4 @@
+import { NextResponse } from "next/server";import { db } from "@/lib/db";import { requirePermission } from "@/lib/auth";
+export async function GET(){const auth=await requirePermission("dashboard.read");if(!auth.ok)return NextResponse.json({message:auth.message},{status:auth.status});const data=await db.notification.findMany({where:{userId:auth.session.userId},orderBy:{createdAt:"desc"},take:100});return NextResponse.json({data,unread:data.filter(x=>!x.readAt).length})}
+export async function PATCH(request:Request){const auth=await requirePermission("dashboard.read");if(!auth.ok)return NextResponse.json({message:auth.message},{status:auth.status});const body=await request.json().catch(()=>({})),where={userId:auth.session.userId,...(body.id?{id:String(body.id)}:{readAt:null})};await db.notification.updateMany({where,data:{readAt:new Date()}});return NextResponse.json({message:"Notifikasi ditandai sudah dibaca."})}
+

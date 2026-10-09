@@ -1,0 +1,8 @@
+import test from "node:test";import assert from "node:assert/strict";import { weighbridgeSchema } from "../src/features/weighbridge/schema";import { productionSchema } from "../src/features/production/schema";
+import { transferSchema } from "../src/features/inventory/schema";
+const uuid="123e4567-e89b-42d3-a456-426614174000";
+test("weighbridge derives from valid gross and tare inputs",()=>{assert.equal(weighbridgeSchema.safeParse({transactionType:"INCOMING",vehicleId:uuid,driverId:uuid,partyType:"QUARRY",partyId:uuid,itemType:"MATERIAL",itemId:uuid,grossWeight:32000,tareWeight:11000}).success,true)});
+test("weighbridge rejects tare equal to or above gross",()=>{assert.equal(weighbridgeSchema.safeParse({transactionType:"OUTGOING",vehicleId:uuid,driverId:uuid,partyType:"CUSTOMER",partyId:uuid,itemType:"PRODUCT",itemId:uuid,grossWeight:10000,tareWeight:10000}).success,false)});
+test("production rejects output plus loss above input",()=>{assert.equal(productionSchema.safeParse({shift:"SHIFT_1",crusherLine:"A",startTime:"2026-09-18T01:00:00Z",endTime:"2026-09-18T09:00:00Z",operatingHours:8,downtimeHours:0,inputs:[{materialId:uuid,quantity:500}],outputs:[{productId:uuid,quantity:480}],rejectWeight:30}).success,false)});
+test("stock transfer rejects the same source and destination",()=>{assert.equal(transferSchema.safeParse({sourceStockpileId:uuid,destinationStockpileId:uuid,productId:uuid,quantity:10,reason:"Relokasi stok"}).success,false)});
+test("stock transfer requires exactly one inventory item",()=>{assert.equal(transferSchema.safeParse({sourceStockpileId:uuid,destinationStockpileId:"223e4567-e89b-42d3-a456-426614174000",productId:uuid,materialId:uuid,quantity:10,reason:"Relokasi stok"}).success,false)});

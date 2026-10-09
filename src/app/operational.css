@@ -1,0 +1,1 @@
+.back-link{font-size:12px;color:#737879;display:flex;gap:5px;align-items:center}.field-error{color:#b64742;font-size:11px}.form-actions{display:grid;gap:8px;margin-top:18px}.form-actions .btn{justify-content:center}@media print{.sidebar,.topbar,.page-head .btn,.form-actions{display:none!important}.main{margin:0;width:100%}.content{padding:0}.card{border:0}}

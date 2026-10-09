@@ -1,0 +1,6 @@
+.avatar { border: 0; }
+.account-menu { position: relative; }
+.account-popover { position: absolute; right: 0; top: 42px; z-index: 40; min-width: 150px; padding: 6px; background: #fff; border: 1px solid var(--line); border-radius: 7px; box-shadow: 0 10px 24px rgba(26, 31, 32, .14); }
+.account-popover button { width: 100%; border: 0; background: transparent; border-radius: 5px; padding: 9px 10px; display: flex; align-items: center; gap: 8px; text-align: left; font-size: 12px; font-weight: 700; color: #333; }
+.account-popover button:hover { background: #fff3dc; color: #9b5709; }
+.account-popover button:disabled { opacity: .6; cursor: wait; }

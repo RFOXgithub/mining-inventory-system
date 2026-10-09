@@ -1,0 +1,1531 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum DocumentStatus {
+  DRAFT
+  SUBMITTED
+  WAITING_APPROVAL
+  APPROVED
+  REJECTED
+  CANCELLED
+  COMPLETED
+}
+
+enum StockDirection {
+  IN
+  OUT
+}
+
+enum InventoryType {
+  RECEIVING
+  PRODUCTION_CONSUMPTION
+  PRODUCTION_OUTPUT
+  SALES_DELIVERY
+  TRANSFER
+  TRANSFER_IN
+  TRANSFER_OUT
+  ADJUSTMENT
+  RETURN
+  MAINTENANCE_USAGE
+}
+
+enum StockpileType {
+  RAW_MATERIAL
+  FINISHED_GOODS
+  WASTE
+  TEMPORARY
+}
+
+enum StockpileStatus {
+  ACTIVE
+  NEAR_CAPACITY
+  FULL
+  INACTIVE
+}
+
+model User {
+  id                String           @id @default(uuid()) @db.Uuid
+  email             String           @unique
+  passwordHash      String
+  name              String
+  username          String?          @unique
+  employeeCode      String?
+  department        String?
+  status            String           @default("ACTIVE")
+  lastLoginAt       DateTime?
+  lockedUntil       DateTime?
+  active            Boolean          @default(true)
+  functions         AdminFunction[]  @default([])
+  actionPermissions String[]         @default([])
+  allPlants         Boolean          @default(false)
+  sessionVersion    Int              @default(0)
+  plantScopes       UserPlantScope[]
+  roles             UserRole[]
+  audits            AuditLog[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+}
+
+model Role {
+  id          String           @id @default(uuid()) @db.Uuid
+  code        String           @unique
+  name        String
+  users       UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id    String           @id @default(uuid()) @db.Uuid
+  code  String           @unique
+  name  String
+  roles RolePermission[]
+}
+
+model UserRole {
+  userId String @db.Uuid
+  roleId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id])
+  role   Role   @relation(fields: [roleId], references: [id])
+
+  @@id([userId, roleId])
+}
+
+model RolePermission {
+  roleId       String     @db.Uuid
+  permissionId String     @db.Uuid
+  role         Role       @relation(fields: [roleId], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id])
+
+  @@id([roleId, permissionId])
+}
+
+model Product {
+  id             String                 @id @default(uuid()) @db.Uuid
+  code           String                 @unique
+  name           String
+  category       String
+  unit           String                 @default("TON")
+  sellingPrice   Decimal                @db.Decimal(18, 2)
+  minimumStock   Decimal                @default(0) @db.Decimal(18, 3)
+  active         Boolean                @default(true)
+  inventory      InventoryTransaction[]
+  outputs        ProductionOutput[]
+  stockpiles     Stockpile[]
+  quotationItems QuotationItem[]
+  invoiceItems   InvoiceItem[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  deletedAt      DateTime?
+  catalogItem    CatalogItem?
+}
+
+model Material {
+  id          String                 @id @default(uuid()) @db.Uuid
+  code        String                 @unique
+  name        String
+  unit        String                 @default("TON")
+  active      Boolean                @default(true)
+  inventory   InventoryTransaction[]
+  inputs      ProductionInput[]
+  stockpiles  Stockpile[]
+  catalogItem CatalogItem?
+}
+
+model Customer {
+  id           String       @id @default(uuid()) @db.Uuid
+  code         String       @unique
+  companyName  String
+  pic          String
+  phone        String
+  email        String?
+  address      String
+  npwp         String?
+  creditLimit  Decimal      @db.Decimal(18, 2)
+  paymentTerms Int
+  customerType String
+  active       Boolean      @default(true)
+  orders       SalesOrder[]
+  quotations   Quotation[]
+  invoices     Invoice[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  deletedAt    DateTime?
+}
+
+model Vehicle {
+  id               String                   @id @default(uuid()) @db.Uuid
+  code             String                   @unique
+  plateNumber      String                   @unique
+  vehicleType      String
+  brand            String?
+  model            String?
+  year             Int?
+  capacity         Decimal                  @db.Decimal(10, 2)
+  ownership        String
+  vendor           String?
+  assignedDriverId String?                  @db.Uuid
+  stnkExpiry       DateTime
+  kirExpiry        DateTime
+  insuranceExpiry  DateTime?
+  status           String
+  weighings        WeighbridgeTransaction[]
+  deliveries       DeliveryOrder[]
+  assignedDriver   Driver?                  @relation("VehicleAssignedDriver", fields: [assignedDriverId], references: [id])
+  maintenances     VehicleMaintenance[]
+}
+
+model Driver {
+  id               String                   @id @default(uuid()) @db.Uuid
+  code             String                   @unique
+  name             String
+  phone            String
+  licenseNumber    String                   @unique
+  licenseType      String
+  licenseExpiry    DateTime
+  active           Boolean                  @default(true)
+  weighings        WeighbridgeTransaction[]
+  deliveries       DeliveryOrder[]
+  assignedVehicles Vehicle[]                @relation("VehicleAssignedDriver")
+}
+
+model VehicleMaintenance {
+  id          String    @id @default(uuid()) @db.Uuid
+  vehicleId   String    @db.Uuid
+  description String
+  status      String    @default("SCHEDULED")
+  scheduledAt DateTime
+  startedAt   DateTime?
+  completedAt DateTime?
+  cost        Decimal   @default(0) @db.Decimal(18, 2)
+  vehicle     Vehicle   @relation(fields: [vehicleId], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@index([vehicleId, status, scheduledAt])
+}
+
+model Stockpile {
+  id              String                 @id @default(uuid()) @db.Uuid
+  code            String                 @unique
+  name            String
+  type            StockpileType
+  location        String
+  maximumCapacity Decimal                @default(0) @db.Decimal(18, 3)
+  minimumStock    Decimal                @default(0) @db.Decimal(18, 3)
+  unit            String                 @default("TON")
+  status          StockpileStatus        @default(ACTIVE)
+  notes           String?
+  productId       String?                @db.Uuid
+  materialId      String?                @db.Uuid
+  product         Product?               @relation(fields: [productId], references: [id])
+  material        Material?              @relation(fields: [materialId], references: [id])
+  opnames         StockOpname[]
+  inventory       InventoryTransaction[]
+  receivingItems  ReceivingItem[]
+  locationMaster  PlantLocation?
+}
+
+enum AdminFunction {
+  PC
+  FINANCE
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  VERIFIED
+}
+
+enum PlantKind {
+  SC
+  BP
+  AMP
+}
+
+enum LocationKind {
+  STOCKPILE
+  WAREHOUSE
+  TANK
+  QUARRY
+}
+
+enum CatalogKind {
+  MATERIAL
+  PRODUCT
+  SERVICE
+}
+
+enum UomDimension {
+  UNKNOWN
+  MASS
+  VOLUME
+  COUNT
+  TIME
+  SERVICE
+}
+
+model Plant {
+  id                 String             @id @default(uuid()) @db.Uuid
+  code               String             @unique
+  name               String
+  kind               PlantKind
+  active             Boolean            @default(true)
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+  evidence           String?
+  createdBy          String             @db.Uuid
+  updatedBy          String?            @db.Uuid
+  verifiedBy         String?            @db.Uuid
+  verifiedAt         DateTime?
+  version            Int                @default(1)
+  locations          PlantLocation[]
+  userScopes         UserPlantScope[]
+  items              CatalogItemPlant[]
+  stockPeriods       StockPeriod[]
+  operationalRuns    OperationalRun[]
+  operationalConfigs OperationalConfig[]
+  commerceConfigs    CommerceConfig[]
+  commerceRecords    CommerceRecord[]
+  financialConfigs   FinancialConfig[]
+  financialRecords   FinancialRecord[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+}
+
+model UserPlantScope {
+  userId  String @db.Uuid
+  plantId String @db.Uuid
+  user    User   @relation(fields: [userId], references: [id])
+  plant   Plant  @relation(fields: [plantId], references: [id])
+
+  @@id([userId, plantId])
+}
+
+model PlantLocation {
+  id                 String             @id @default(uuid()) @db.Uuid
+  plantId            String             @db.Uuid
+  code               String
+  name               String
+  kind               LocationKind
+  stockpileId        String?            @unique @db.Uuid
+  active             Boolean            @default(true)
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+  evidence           String?
+  createdBy          String             @db.Uuid
+  updatedBy          String?            @db.Uuid
+  verifiedBy         String?            @db.Uuid
+  verifiedAt         DateTime?
+  version            Int                @default(1)
+  plant              Plant              @relation(fields: [plantId], references: [id])
+  stockpile          Stockpile?         @relation(fields: [stockpileId], references: [id])
+  stockLines         StockDocumentLine[] @relation("StockSourceLocation")
+  stockDestinations  StockDocumentLine[] @relation("StockDestinationLocation")
+  openingClaims      StockOpeningClaim[]
+  stockEntries       StockLedgerEntry[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@unique([plantId, code])
+}
+
+model Uom {
+  id                 String             @id @default(uuid()) @db.Uuid
+  code               String             @unique
+  name               String
+  dimension          UomDimension
+  active             Boolean            @default(true)
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+  evidence           String?
+  createdBy          String?            @db.Uuid
+  verifiedBy         String?            @db.Uuid
+  createdAt          DateTime           @default(now())
+  items              CatalogItem[]
+  conversionsFrom    UomConversion[]    @relation("ConversionFrom")
+  conversionsTo      UomConversion[]    @relation("ConversionTo")
+  stockEntries       StockLedgerEntry[]
+}
+
+model CatalogItem {
+  id                 String             @id @default(uuid()) @db.Uuid
+  code               String
+  name               String
+  kind               CatalogKind
+  category           String
+  specification      String?
+  primaryUomId       String             @db.Uuid
+  legacyProductId    String?            @unique @db.Uuid
+  legacyMaterialId   String?            @unique @db.Uuid
+  active             Boolean            @default(true)
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+  evidence           String?
+  createdBy          String?            @db.Uuid
+  updatedBy          String?            @db.Uuid
+  verifiedBy         String?            @db.Uuid
+  verifiedAt         DateTime?
+  version            Int                @default(1)
+  primaryUom         Uom                @relation(fields: [primaryUomId], references: [id])
+  legacyProduct      Product?           @relation(fields: [legacyProductId], references: [id])
+  legacyMaterial     Material?          @relation(fields: [legacyMaterialId], references: [id])
+  aliases            ItemAlias[]
+  conversions        UomConversion[]
+  plants             CatalogItemPlant[]
+  stockLines         StockDocumentLine[]
+  stockEntries       StockLedgerEntry[]
+  openingClaims      StockOpeningClaim[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@unique([kind, code])
+}
+
+model CatalogItemPlant {
+  itemId  String      @db.Uuid
+  plantId String      @db.Uuid
+  item    CatalogItem @relation(fields: [itemId], references: [id])
+  plant   Plant       @relation(fields: [plantId], references: [id])
+
+  @@id([itemId, plantId])
+}
+
+model ItemAlias {
+  id                 String             @id @default(uuid()) @db.Uuid
+  itemId             String             @db.Uuid
+  name               String
+  normalizedName     String
+  active             Boolean            @default(true)
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+  evidence           String?
+  createdBy          String             @db.Uuid
+  verifiedBy         String?            @db.Uuid
+  verifiedAt         DateTime?
+  item               CatalogItem        @relation(fields: [itemId], references: [id])
+
+  @@unique([itemId, normalizedName])
+}
+
+model UomConversion {
+  id                 String             @id @default(uuid()) @db.Uuid
+  itemId             String             @db.Uuid
+  fromUomId          String             @db.Uuid
+  toUomId            String             @db.Uuid
+  factor             Decimal            @db.Decimal(24, 12)
+  version            Int
+  effectiveFrom      DateTime
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+  evidence           String?
+  createdBy          String             @db.Uuid
+  verifiedBy         String?            @db.Uuid
+  verifiedAt         DateTime?
+  item               CatalogItem        @relation(fields: [itemId], references: [id])
+  fromUom            Uom                @relation("ConversionFrom", fields: [fromUomId], references: [id])
+  toUom              Uom                @relation("ConversionTo", fields: [toUomId], references: [id])
+
+  @@unique([itemId, fromUomId, toUomId, version])
+}
+
+enum StockDocumentKind {
+  DELIVERY
+  PRODUCTION
+  BLENDING
+  FUEL_USAGE
+  RECEIPT
+  TRANSFER
+  OPENING
+  LEGACY_IMPORT
+  OPNAME
+  ADJUSTMENT
+  INTERNAL_ISSUE
+  REVERSAL
+}
+
+enum StockDocumentStatus {
+  SUBMITTED
+  POSTED
+  REJECTED
+  REVERSED
+}
+
+model StockPeriod {
+  id           String @id @default(uuid()) @db.Uuid
+  plantId      String @db.Uuid
+  month        String
+  closed       Boolean @default(false)
+  requestedBy  String? @db.Uuid
+  requestClose Boolean?
+  reason       String?
+  financeBy    String? @db.Uuid
+  evidence     String?
+  approvedBy   String? @db.Uuid
+  reconciliationHash String?
+  version      Int @default(1)
+  plant        Plant @relation(fields: [plantId], references: [id])
+  @@unique([plantId, month])
+}
+
+model StockDocument {
+  id            String @id @default(uuid()) @db.Uuid
+  number        String @unique
+  kind          StockDocumentKind
+  status        StockDocumentStatus @default(SUBMITTED)
+  requestKey    String @unique @db.Uuid
+  payloadHash   String
+  effectiveAt   DateTime
+  reason        String
+  evidence      String
+  sourceName    String?
+  checksum      String?
+  sourceSnapshot Json?
+  makerId       String @db.Uuid
+  financeBy     String? @db.Uuid
+  financeEvidence String?
+  approvedBy    String? @db.Uuid
+  approvedAt    DateTime?
+  reversalOfId  String? @unique @db.Uuid
+  version       Int @default(1)
+  lines         StockDocumentLine[]
+  entries       StockLedgerEntry[]
+  openingClaims StockOpeningClaim[]
+  dependencies  StockDependency[] @relation("StockDependencySource")
+  dependents    StockDependency[] @relation("StockDependencyTarget")
+  reversalOf    StockDocument? @relation("StockReversal", fields: [reversalOfId], references: [id])
+  reversal      StockDocument? @relation("StockReversal")
+  createdAt     DateTime @default(now())
+  @@index([kind, createdAt])
+  operationalRun OperationalRun?
+  commerceRecord CommerceRecord?
+}
+
+// Additive commercial sources; legacy quotation/order/delivery rows remain archives.
+model CommerceConfig {
+  id             String @id @default(uuid()) @db.Uuid
+  requestKey     String @unique @db.Uuid
+  payloadHash    String
+  plantId        String @db.Uuid
+  kind           String
+  code           String
+  revision       Int
+  effectiveFrom  DateTime
+  payload        Json
+  evidence       String
+  makerId        String @db.Uuid
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+  pcBy           String? @db.Uuid
+  pcEvidence     String?
+  financeBy      String? @db.Uuid
+  financeEvidence String?
+  verifiedBy     String? @db.Uuid
+  verifiedAt     DateTime?
+  verificationEvidence String?
+  createdAt      DateTime @default(now())
+  plant          Plant @relation(fields: [plantId], references: [id])
+  @@unique([plantId, kind, code, revision])
+  @@index([plantId, kind, verificationStatus])
+}
+
+model CommerceRecord {
+  id             String @id @default(uuid()) @db.Uuid
+  number         String @unique
+  requestKey     String @unique @db.Uuid
+  payloadHash    String
+  kind           String
+  plantId        String @db.Uuid
+  effectiveAt    DateTime
+  status         String @default("DRAFT")
+  payload        Json
+  snapshot       Json?
+  completion     Json?
+  completionHash String?
+  version        Int @default(1)
+  revision       Int @default(1)
+  makerId        String @db.Uuid
+  submitterId    String? @db.Uuid
+  verifierId     String? @db.Uuid
+  approverId     String? @db.Uuid
+  posterId       String? @db.Uuid
+  decisionEvidence String?
+  rootId         String @db.Uuid
+  previousId     String? @db.Uuid
+  parentId       String? @db.Uuid
+  poId           String? @db.Uuid
+  stockDocumentId String? @unique @db.Uuid
+  createdAt      DateTime @default(now())
+  plant          Plant @relation(fields: [plantId], references: [id])
+  root           CommerceRecord @relation("CommerceRoot", fields: [rootId], references: [id])
+  versions       CommerceRecord[] @relation("CommerceRoot")
+  previous       CommerceRecord? @relation("CommercePrevious", fields: [previousId], references: [id])
+  amendments     CommerceRecord[] @relation("CommercePrevious")
+  parent         CommerceRecord? @relation("CommerceParent", fields: [parentId], references: [id])
+  children       CommerceRecord[] @relation("CommerceParent")
+  po             CommerceRecord? @relation("CommercePO", fields: [poId], references: [id])
+  orders         CommerceRecord[] @relation("CommercePO")
+  stockDocument  StockDocument? @relation(fields: [stockDocumentId], references: [id])
+  fulfillments   CommerceFulfillment[] @relation("FulfillmentDelivery")
+  orderFulfillments CommerceFulfillment[] @relation("FulfillmentSO")
+  poFulfillments  CommerceFulfillment[] @relation("FulfillmentPO")
+  billingLines   FinancialInvoiceLine[]
+  @@unique([rootId, revision])
+  @@index([plantId, kind, effectiveAt, status])
+}
+
+model CommerceFulfillment {
+  id             String @id @default(uuid()) @db.Uuid
+  deliveryId     String @db.Uuid
+  salesOrderId   String @db.Uuid
+  poVersionId    String? @db.Uuid
+  poRootId       String? @db.Uuid
+  orderLineKey   String @db.Uuid
+  poLineKey      String? @db.Uuid
+  itemId         String @db.Uuid
+  uomId          String @db.Uuid
+  quantity       Decimal @db.Decimal(24, 6)
+  effectiveAt    DateTime
+  actorId        String @db.Uuid
+  delivery       CommerceRecord @relation("FulfillmentDelivery", fields: [deliveryId], references: [id])
+  salesOrder     CommerceRecord @relation("FulfillmentSO", fields: [salesOrderId], references: [id])
+  poVersion      CommerceRecord? @relation("FulfillmentPO", fields: [poVersionId], references: [id])
+  @@unique([deliveryId, orderLineKey])
+  @@index([salesOrderId, orderLineKey])
+  @@index([poRootId, poLineKey])
+}
+
+model FinancialConfig {
+  id             String @id @default(uuid()) @db.Uuid
+  requestKey     String @unique @db.Uuid
+  payloadHash    String
+  plantId        String @db.Uuid
+  kind           String
+  code           String
+  revision       Int
+  effectiveFrom  DateTime
+  payload        Json
+  evidence       String
+  makerId        String @db.Uuid
+  financeBy      String? @db.Uuid
+  financeEvidence String?
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+  verifiedBy     String? @db.Uuid
+  verificationEvidence String?
+  verifiedAt     DateTime?
+  createdAt      DateTime @default(now())
+  plant          Plant @relation(fields: [plantId], references: [id])
+  @@unique([plantId, kind, code, revision])
+  @@index([plantId, kind, verificationStatus])
+}
+
+model FinancialRecord {
+  id             String @id @default(uuid()) @db.Uuid
+  number         String @unique
+  requestKey     String @unique @db.Uuid
+  payloadHash    String
+  kind           String
+  plantId        String @db.Uuid
+  effectiveAt    DateTime
+  customerCode   String?
+  projectCode    String?
+  currency       String?
+  status         String @default("DRAFT")
+  payload        Json
+  snapshot       Json?
+  dueDate        String?
+  makerId        String @db.Uuid
+  submitterId    String? @db.Uuid
+  verifierId     String? @db.Uuid
+  posterId       String? @db.Uuid
+  decisionEvidence String?
+  version        Int @default(1)
+  targetId       String? @db.Uuid
+  target         FinancialRecord? @relation("FinancialCorrection", fields: [targetId], references: [id])
+  corrections    FinancialRecord[] @relation("FinancialCorrection")
+  plant          Plant @relation(fields: [plantId], references: [id])
+  lines          FinancialInvoiceLine[]
+  events         FinancialEvent[] @relation("FinancialEventSource")
+  invoiceEvents  FinancialEvent[] @relation("FinancialEventInvoice")
+  receiptEvents  FinancialEvent[] @relation("FinancialEventReceipt")
+  createdAt      DateTime @default(now())
+  @@index([plantId, kind, effectiveAt, status])
+  @@index([customerCode, currency])
+}
+
+model FinancialInvoiceLine {
+  id             String @id @default(uuid()) @db.Uuid
+  invoiceId      String @db.Uuid
+  deliveryId     String @db.Uuid
+  sourceKey      String @db.Uuid
+  role           String
+  quantity       Decimal @db.Decimal(24, 6)
+  unitPrice      Decimal @db.Decimal(24, 2)
+  amount         Decimal @db.Decimal(24, 2)
+  sourceSnapshot Json
+  invoice        FinancialRecord @relation(fields: [invoiceId], references: [id])
+  delivery       CommerceRecord @relation(fields: [deliveryId], references: [id])
+  @@unique([invoiceId, deliveryId, sourceKey, role])
+  @@index([deliveryId, sourceKey])
+}
+
+model FinancialEvent {
+  id             String @id @default(uuid()) @db.Uuid
+  sequence       BigInt @unique @default(autoincrement())
+  eventKey       String @unique
+  recordId       String @db.Uuid
+  invoiceId      String? @db.Uuid
+  receiptId      String? @db.Uuid
+  kind           String
+  amount         Decimal @db.Decimal(24, 2)
+  effectiveAt    DateTime
+  actorId        String @db.Uuid
+  reversalOfId   String? @unique @db.Uuid
+  source         FinancialRecord @relation("FinancialEventSource", fields: [recordId], references: [id])
+  invoice        FinancialRecord? @relation("FinancialEventInvoice", fields: [invoiceId], references: [id])
+  receipt        FinancialRecord? @relation("FinancialEventReceipt", fields: [receiptId], references: [id])
+  reversalOf     FinancialEvent? @relation("FinancialEventReversal", fields: [reversalOfId], references: [id])
+  reversal       FinancialEvent? @relation("FinancialEventReversal")
+  createdAt      DateTime @default(now())
+  @@index([invoiceId, effectiveAt])
+  @@index([receiptId, effectiveAt])
+}
+
+enum OperationalStatus {
+  DRAFT
+  SUBMITTED
+  VERIFIED
+  POSTED
+  REJECTED
+  REVERSED
+}
+
+model OperationalConfig {
+  id            String @id @default(uuid()) @db.Uuid
+  requestKey    String @unique @db.Uuid
+  payloadHash   String
+  plantId       String @db.Uuid
+  kind          String
+  code          String
+  revision      Int
+  effectiveFrom DateTime
+  payload       Json
+  evidence      String
+  makerId       String @db.Uuid
+  verificationStatus VerificationStatus @default(UNVERIFIED)
+  verifiedBy    String? @db.Uuid
+  verifiedAt    DateTime?
+  verificationEvidence String?
+  assetRootId   String? @db.Uuid
+  assetRoot     OperationalConfig? @relation("OperationalAssetRoot", fields: [assetRootId], references: [id])
+  assetVersions OperationalConfig[] @relation("OperationalAssetRoot")
+  plant         Plant @relation(fields: [plantId], references: [id])
+  mixRuns       OperationalRun[]
+  createdAt     DateTime @default(now())
+  @@unique([plantId, kind, code, revision])
+  @@index([plantId, kind, verificationStatus])
+}
+
+model OperationalRun {
+  id            String @id @default(uuid()) @db.Uuid
+  number        String @unique
+  requestKey    String @unique @db.Uuid
+  payloadHash   String
+  kind          String
+  plantId       String @db.Uuid
+  effectiveAt   DateTime
+  status        OperationalStatus @default(DRAFT)
+  payload       Json
+  snapshot      Json?
+  version       Int @default(1)
+  makerId       String @db.Uuid
+  submitterId   String? @db.Uuid
+  verifierId    String? @db.Uuid
+  posterId      String? @db.Uuid
+  decisionEvidence String?
+  mixVersionId  String? @db.Uuid
+  fuelUsageId   String? @db.Uuid
+  stockDocumentId String? @unique @db.Uuid
+  plant         Plant @relation(fields: [plantId], references: [id])
+  mixVersion    OperationalConfig? @relation(fields: [mixVersionId], references: [id])
+  fuelUsage     OperationalRun? @relation("RunFuelUsage", fields: [fuelUsageId], references: [id])
+  fuelConsumers OperationalRun[] @relation("RunFuelUsage")
+  stockDocument StockDocument? @relation(fields: [stockDocumentId], references: [id])
+  createdAt     DateTime @default(now())
+  @@index([plantId, kind, effectiveAt, status])
+}
+
+model StockDocumentLine {
+  id            String @id @default(uuid()) @db.Uuid
+  documentId    String @db.Uuid
+  lineNo        Int
+  itemId        String @db.Uuid
+  locationId    String @db.Uuid
+  destinationId String? @db.Uuid
+  quantity      Decimal @db.Decimal(24, 6)
+  bookQuantity  Decimal? @db.Decimal(24, 6)
+  snapshotHash  String?
+  itemName      String
+  uomCode       String
+  document      StockDocument @relation(fields: [documentId], references: [id])
+  item          CatalogItem @relation(fields: [itemId], references: [id])
+  location      PlantLocation @relation("StockSourceLocation", fields: [locationId], references: [id])
+  destination   PlantLocation? @relation("StockDestinationLocation", fields: [destinationId], references: [id], onDelete: Restrict, map: "stock_destination_fk")
+  @@unique([documentId, lineNo])
+}
+
+model StockLedgerEntry {
+  id           String @id @default(uuid()) @db.Uuid
+  sequence     BigInt @unique @default(autoincrement())
+  documentId   String @db.Uuid
+  eventKey     String @unique
+  lineNo       Int
+  itemId       String @db.Uuid
+  locationId   String @db.Uuid
+  uomId        String @db.Uuid
+  quantity     Decimal @db.Decimal(24, 6)
+  effectiveAt  DateTime
+  legacyId     String? @unique @db.Uuid
+  sourceRef    String?
+  actorId      String @db.Uuid
+  createdAt    DateTime @default(now())
+  document     StockDocument @relation(fields: [documentId], references: [id])
+  item         CatalogItem @relation(fields: [itemId], references: [id])
+  location     PlantLocation @relation(fields: [locationId], references: [id])
+  uom          Uom @relation(fields: [uomId], references: [id])
+  @@index([locationId, itemId, effectiveAt])
+}
+
+model StockOpeningClaim {
+  locationId String @db.Uuid
+  itemId     String @db.Uuid
+  documentId String @db.Uuid
+  location PlantLocation @relation(fields: [locationId], references: [id], onDelete: Restrict, map: "stock_opening_location_fk")
+  item CatalogItem @relation(fields: [itemId], references: [id], onDelete: Restrict, map: "stock_opening_item_fk")
+  document StockDocument @relation(fields: [documentId], references: [id], onDelete: Restrict, map: "stock_opening_source_fk")
+  @@id([locationId, itemId])
+}
+
+model StockDependency {
+  sourceId String @db.Uuid
+  dependentId String @db.Uuid
+  source StockDocument @relation("StockDependencySource", fields: [sourceId], references: [id], onDelete: Restrict, map: "stock_dependency_source_fk")
+  dependent StockDocument @relation("StockDependencyTarget", fields: [dependentId], references: [id], onDelete: Restrict, map: "stock_dependency_target_fk")
+  @@id([sourceId, dependentId])
+}
+
+model InventoryTransaction {
+  id            String         @id @default(uuid()) @db.Uuid
+  number        String         @unique
+  stockpileId   String         @db.Uuid
+  productId     String?        @db.Uuid
+  materialId    String?        @db.Uuid
+  sparePartId   String?        @db.Uuid
+  type          InventoryType
+  direction     StockDirection
+  quantity      Decimal        @db.Decimal(18, 3)
+  unitCost      Decimal?       @db.Decimal(18, 2)
+  referenceType String
+  referenceId   String         @db.Uuid
+  reason        String?
+  notes         String?
+  balanceAfter  Decimal        @db.Decimal(18, 3)
+  processingKey String         @unique
+  approvedAt    DateTime?
+  createdBy     String         @db.Uuid
+  createdAt     DateTime       @default(now())
+  stockpile     Stockpile      @relation(fields: [stockpileId], references: [id])
+  product       Product?       @relation(fields: [productId], references: [id])
+  material      Material?      @relation(fields: [materialId], references: [id])
+  sparePart     SparePart?     @relation(fields: [sparePartId], references: [id])
+
+  @@index([stockpileId, productId, createdAt])
+  @@index([referenceType, referenceId])
+}
+
+model StockOpname {
+  id            String         @id @default(uuid()) @db.Uuid
+  number        String         @unique
+  stockpileId   String         @db.Uuid
+  productId     String?        @db.Uuid
+  materialId    String?        @db.Uuid
+  systemStock   Decimal        @db.Decimal(18, 3)
+  physicalStock Decimal        @db.Decimal(18, 3)
+  variance      Decimal        @db.Decimal(18, 3)
+  reason        String
+  notes         String?
+  status        DocumentStatus @default(DRAFT)
+  countedBy     String         @db.Uuid
+  approvedBy    String?        @db.Uuid
+  approvedAt    DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  stockpile     Stockpile      @relation(fields: [stockpileId], references: [id])
+
+  @@index([stockpileId, createdAt])
+}
+
+model WeighbridgeTransaction {
+  id              String         @id @default(uuid()) @db.Uuid
+  ticketNumber    String         @unique
+  transactionType String
+  vehicleId       String         @db.Uuid
+  driverId        String         @db.Uuid
+  partyType       String
+  partyId         String         @db.Uuid
+  itemType        String
+  itemId          String         @db.Uuid
+  grossWeight     Decimal        @db.Decimal(18, 3)
+  tareWeight      Decimal        @db.Decimal(18, 3)
+  netWeight       Decimal        @db.Decimal(18, 3)
+  status          DocumentStatus @default(DRAFT)
+  notes           String?
+  approvedAt      DateTime?
+  createdBy       String         @db.Uuid
+  createdAt       DateTime       @default(now())
+  vehicle         Vehicle        @relation(fields: [vehicleId], references: [id])
+  driver          Driver         @relation(fields: [driverId], references: [id])
+
+  @@index([vehicleId, status])
+}
+
+model ProductionBatch {
+  id             String             @id @default(uuid()) @db.Uuid
+  number         String             @unique
+  productionDate DateTime
+  shift          String
+  crusherLine    String
+  supervisorId   String             @db.Uuid
+  startTime      DateTime
+  endTime        DateTime?
+  operatingHours Decimal            @db.Decimal(8, 2)
+  downtimeHours  Decimal            @default(0) @db.Decimal(8, 2)
+  rejectWeight   Decimal            @default(0) @db.Decimal(18, 3)
+  targetWeight   Decimal            @db.Decimal(18, 3)
+  status         DocumentStatus     @default(DRAFT)
+  inputs         ProductionInput[]
+  outputs        ProductionOutput[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+}
+
+model ProductionInput {
+  id         String          @id @default(uuid()) @db.Uuid
+  batchId    String          @db.Uuid
+  materialId String          @db.Uuid
+  quantity   Decimal         @db.Decimal(18, 3)
+  batch      ProductionBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  material   Material        @relation(fields: [materialId], references: [id])
+}
+
+model ProductionOutput {
+  id        String          @id @default(uuid()) @db.Uuid
+  batchId   String          @db.Uuid
+  productId String          @db.Uuid
+  quantity  Decimal         @db.Decimal(18, 3)
+  batch     ProductionBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  product   Product         @relation(fields: [productId], references: [id])
+}
+
+model SalesOrder {
+  id         String           @id @default(uuid()) @db.Uuid
+  number     String           @unique
+  customerId String           @db.Uuid
+  orderDate  DateTime
+  status     String
+  subtotal   Decimal          @db.Decimal(18, 2)
+  tax        Decimal          @db.Decimal(18, 2)
+  total      Decimal          @db.Decimal(18, 2)
+  customer   Customer         @relation(fields: [customerId], references: [id])
+  items      SalesOrderItem[]
+  deliveries DeliveryOrder[]
+  quotations Quotation[]
+  invoices   Invoice[]
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+}
+
+model SalesOrderItem {
+  id                  String     @id @default(uuid()) @db.Uuid
+  salesOrderId        String     @db.Uuid
+  productId           String     @db.Uuid
+  descriptionSnapshot String
+  quantity            Decimal    @db.Decimal(18, 3)
+  deliveredQuantity   Decimal    @default(0) @db.Decimal(18, 3)
+  unitPrice           Decimal    @db.Decimal(18, 2)
+  salesOrder          SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+}
+
+model DeliveryOrder {
+  id                  String     @id @default(uuid()) @db.Uuid
+  number              String     @unique
+  suratJalanNumber    String?    @unique
+  salesOrderId        String     @db.Uuid
+  vehicleId           String?    @db.Uuid
+  driverId            String?    @db.Uuid
+  destinationSnapshot String
+  plannedQuantity     Decimal    @db.Decimal(18, 3)
+  netWeight           Decimal?   @db.Decimal(18, 3)
+  status              String
+  salesOrder          SalesOrder @relation(fields: [salesOrderId], references: [id])
+  vehicle             Vehicle?   @relation(fields: [vehicleId], references: [id])
+  driver              Driver?    @relation(fields: [driverId], references: [id])
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+}
+
+model Quotation {
+  id            String          @id @default(uuid()) @db.Uuid
+  number        String          @unique
+  customerId    String          @db.Uuid
+  salesOrderId  String?         @db.Uuid
+  quotationDate DateTime        @default(now())
+  validUntil    DateTime
+  status        String          @default("DRAFT")
+  subtotal      Decimal         @db.Decimal(18, 2)
+  tax           Decimal         @default(0) @db.Decimal(18, 2)
+  total         Decimal         @db.Decimal(18, 2)
+  notes         String?
+  customer      Customer        @relation(fields: [customerId], references: [id])
+  salesOrder    SalesOrder?     @relation(fields: [salesOrderId], references: [id])
+  items         QuotationItem[]
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([customerId, status])
+}
+
+model QuotationItem {
+  id                  String    @id @default(uuid()) @db.Uuid
+  quotationId         String    @db.Uuid
+  productId           String    @db.Uuid
+  descriptionSnapshot String
+  quantity            Decimal   @db.Decimal(18, 3)
+  unitPrice           Decimal   @db.Decimal(18, 2)
+  quotation           Quotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+  product             Product   @relation(fields: [productId], references: [id])
+}
+
+model Invoice {
+  id           String        @id @default(uuid()) @db.Uuid
+  number       String        @unique
+  customerId   String        @db.Uuid
+  salesOrderId String?       @db.Uuid
+  issueDate    DateTime
+  dueDate      DateTime
+  status       String        @default("DRAFT")
+  subtotal     Decimal       @db.Decimal(18, 2)
+  tax          Decimal       @default(0) @db.Decimal(18, 2)
+  total        Decimal       @db.Decimal(18, 2)
+  customer     Customer      @relation(fields: [customerId], references: [id])
+  salesOrder   SalesOrder?   @relation(fields: [salesOrderId], references: [id])
+  items        InvoiceItem[]
+  payments     Payment[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([customerId, status, dueDate])
+}
+
+model InvoiceItem {
+  id          String   @id @default(uuid()) @db.Uuid
+  invoiceId   String   @db.Uuid
+  productId   String?  @db.Uuid
+  description String
+  quantity    Decimal  @db.Decimal(18, 3)
+  unitPrice   Decimal  @db.Decimal(18, 2)
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product     Product? @relation(fields: [productId], references: [id])
+}
+
+model Payment {
+  id          String   @id @default(uuid()) @db.Uuid
+  number      String   @unique
+  invoiceId   String   @db.Uuid
+  paymentDate DateTime
+  amount      Decimal  @db.Decimal(18, 2)
+  method      String
+  reference   String?
+  notes       String?
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id])
+  createdAt   DateTime @default(now())
+
+  @@index([invoiceId, paymentDate])
+}
+
+model Supplier {
+  id                  String          @id @default(uuid()) @db.Uuid
+  code                String          @unique
+  name                String
+  category            String
+  materials           String[]        @default([])
+  pic                 String
+  phone               String
+  email               String?
+  address             String
+  taxInformation      String?
+  paymentTerms        Int             @default(30)
+  status              String          @default("ACTIVE")
+  purchaseMonthToDate Decimal         @default(0) @db.Decimal(18, 2)
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  purchaseOrders      PurchaseOrder[]
+  spareParts          SparePart[]
+
+  @@index([category, status])
+}
+
+model PurchaseRequest {
+  id             String                @id @default(uuid()) @db.Uuid
+  number         String                @unique
+  requestDate    DateTime              @default(now())
+  department     String
+  requesterId    String                @db.Uuid
+  requesterName  String
+  requiredDate   DateTime
+  priority       String                @default("NORMAL")
+  status         String                @default("DRAFT")
+  reason         String
+  notes          String?
+  estimatedTotal Decimal               @default(0) @db.Decimal(18, 2)
+  items          PurchaseRequestItem[]
+  purchaseOrders PurchaseOrder[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([status, department, requestDate])
+}
+
+model PurchaseRequestItem {
+  id                 String              @id @default(uuid()) @db.Uuid
+  purchaseRequestId  String              @db.Uuid
+  sparePartId        String?             @db.Uuid
+  description        String
+  category           String
+  quantity           Decimal             @db.Decimal(18, 3)
+  unit               String
+  estimatedPrice     Decimal             @db.Decimal(18, 2)
+  reason             String
+  purchaseRequest    PurchaseRequest     @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  sparePart          SparePart?          @relation(fields: [sparePartId], references: [id])
+  purchaseOrderItems PurchaseOrderItem[]
+}
+
+model PurchaseOrder {
+  id                String              @id @default(uuid()) @db.Uuid
+  number            String              @unique
+  purchaseRequestId String?             @db.Uuid
+  supplierId        String              @db.Uuid
+  orderDate         DateTime
+  expectedDate      DateTime
+  status            String              @default("DRAFT")
+  subtotal          Decimal             @db.Decimal(18, 2)
+  tax               Decimal             @default(0) @db.Decimal(18, 2)
+  total             Decimal             @db.Decimal(18, 2)
+  notes             String?
+  purchaseRequest   PurchaseRequest?    @relation(fields: [purchaseRequestId], references: [id])
+  supplier          Supplier            @relation(fields: [supplierId], references: [id])
+  items             PurchaseOrderItem[]
+  receivings        Receiving[]
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  @@index([status, supplierId, expectedDate])
+}
+
+model PurchaseOrderItem {
+  id                    String               @id @default(uuid()) @db.Uuid
+  purchaseOrderId       String               @db.Uuid
+  purchaseRequestItemId String?              @db.Uuid
+  sparePartId           String?              @db.Uuid
+  description           String
+  category              String
+  quantity              Decimal              @db.Decimal(18, 3)
+  receivedQuantity      Decimal              @default(0) @db.Decimal(18, 3)
+  unit                  String
+  unitPrice             Decimal              @db.Decimal(18, 2)
+  purchaseOrder         PurchaseOrder        @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  purchaseRequestItem   PurchaseRequestItem? @relation(fields: [purchaseRequestItemId], references: [id])
+  sparePart             SparePart?           @relation(fields: [sparePartId], references: [id])
+  receivingItems        ReceivingItem[]
+}
+
+model Receiving {
+  id              String          @id @default(uuid()) @db.Uuid
+  number          String          @unique
+  purchaseOrderId String          @db.Uuid
+  receivingDate   DateTime        @default(now())
+  deliveryNote    String?
+  receivedById    String          @db.Uuid
+  receivedByName  String
+  notes           String?
+  purchaseOrder   PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id])
+  items           ReceivingItem[]
+  createdAt       DateTime        @default(now())
+}
+
+model ReceivingItem {
+  id                  String            @id @default(uuid()) @db.Uuid
+  receivingId         String            @db.Uuid
+  purchaseOrderItemId String            @db.Uuid
+  stockpileId         String            @db.Uuid
+  quantity            Decimal           @db.Decimal(18, 3)
+  receiving           Receiving         @relation(fields: [receivingId], references: [id], onDelete: Cascade)
+  purchaseOrderItem   PurchaseOrderItem @relation(fields: [purchaseOrderItemId], references: [id])
+  stockpile           Stockpile         @relation(fields: [stockpileId], references: [id])
+}
+
+model Equipment {
+  id                  String               @id @default(uuid()) @db.Uuid
+  code                String               @unique
+  name                String
+  category            String
+  brand               String?
+  model               String?
+  serialNumber        String?              @unique
+  installationDate    DateTime?
+  location            String
+  hourMeter           Decimal              @default(0) @db.Decimal(12, 2)
+  maintenanceInterval Decimal              @default(250) @db.Decimal(12, 2)
+  lastMaintenanceHour Decimal              @default(0) @db.Decimal(12, 2)
+  status              String               @default("OPERATIONAL")
+  maintenances        Maintenance[]
+  compatibleParts     SparePartEquipment[]
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([category, status, location])
+}
+
+model SparePart {
+  id              String                 @id @default(uuid()) @db.Uuid
+  code            String                 @unique
+  name            String
+  category        String
+  manufacturer    String?
+  partNumber      String?
+  unit            String                 @default("PCS")
+  minimumStock    Decimal                @default(0) @db.Decimal(18, 3)
+  unitCost        Decimal                @default(0) @db.Decimal(18, 2)
+  supplierId      String?                @db.Uuid
+  storageLocation String
+  status          String                 @default("ACTIVE")
+  supplier        Supplier?              @relation(fields: [supplierId], references: [id])
+  equipment       SparePartEquipment[]
+  inventory       InventoryTransaction[]
+  requestItems    PurchaseRequestItem[]
+  orderItems      PurchaseOrderItem[]
+  usages          MaintenanceSparePart[]
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+}
+
+model SparePartEquipment {
+  sparePartId String    @db.Uuid
+  equipmentId String    @db.Uuid
+  sparePart   SparePart @relation(fields: [sparePartId], references: [id], onDelete: Cascade)
+  equipment   Equipment @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+
+  @@id([sparePartId, equipmentId])
+}
+
+model Maintenance {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  number                String                 @unique
+  equipmentId           String                 @db.Uuid
+  type                  String
+  priority              String                 @default("NORMAL")
+  status                String                 @default("SCHEDULED")
+  problem               String
+  technician            String?
+  scheduledAt           DateTime
+  startedAt             DateTime?
+  completedAt           DateTime?
+  interruptionStartedAt DateTime?
+  hourMeter             Decimal?               @db.Decimal(12, 2)
+  laborCost             Decimal                @default(0) @db.Decimal(18, 2)
+  externalCost          Decimal                @default(0) @db.Decimal(18, 2)
+  otherCost             Decimal                @default(0) @db.Decimal(18, 2)
+  rootCause             String?
+  correctiveAction      String?
+  notes                 String?
+  equipment             Equipment              @relation(fields: [equipmentId], references: [id])
+  tasks                 MaintenanceTask[]
+  spareParts            MaintenanceSparePart[]
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  @@index([status, scheduledAt, equipmentId])
+}
+
+model MaintenanceTask {
+  id            String      @id @default(uuid()) @db.Uuid
+  maintenanceId String      @db.Uuid
+  description   String
+  required      Boolean     @default(true)
+  completedAt   DateTime?
+  completedBy   String?
+  sortOrder     Int         @default(0)
+  maintenance   Maintenance @relation(fields: [maintenanceId], references: [id], onDelete: Cascade)
+}
+
+model MaintenanceSparePart {
+  id            String      @id @default(uuid()) @db.Uuid
+  maintenanceId String      @db.Uuid
+  sparePartId   String      @db.Uuid
+  stockpileId   String      @db.Uuid
+  quantity      Decimal     @db.Decimal(18, 3)
+  unitCost      Decimal     @db.Decimal(18, 2)
+  maintenance   Maintenance @relation(fields: [maintenanceId], references: [id], onDelete: Cascade)
+  sparePart     SparePart   @relation(fields: [sparePartId], references: [id])
+
+  @@index([maintenanceId, sparePartId])
+}
+
+model ApprovalRequest {
+  id          String            @id @default(uuid()) @db.Uuid
+  module      String
+  recordId    String            @db.Uuid
+  status      DocumentStatus
+  currentStep Int               @default(1)
+  histories   ApprovalHistory[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([module, recordId])
+}
+
+model ApprovalHistory {
+  id         String          @id @default(uuid()) @db.Uuid
+  requestId  String          @db.Uuid
+  approverId String          @db.Uuid
+  action     String
+  notes      String?
+  actedAt    DateTime        @default(now())
+  request    ApprovalRequest @relation(fields: [requestId], references: [id])
+}
+
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  type      String
+  title     String
+  message   String
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
+}
+
+model AuditLog {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String?  @db.Uuid
+  module        String
+  action        String
+  recordId      String?  @db.Uuid
+  previousValue Json?
+  newValue      Json?
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+  user          User?    @relation(fields: [userId], references: [id])
+
+  @@index([module, recordId])
+  @@index([createdAt])
+}
+
+model NumberSequence {
+  id           String @id @default(uuid()) @db.Uuid
+  documentType String
+  period       String
+  prefix       String
+  lastNumber   Int    @default(0)
+  padding      Int    @default(4)
+
+  @@unique([documentType, period])
+}
+
+model SystemSetting {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String   @unique
+  section   String
+  value     Json
+  updatedBy String?  @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([section])
+}
+
+model StageConfig {
+  id            String   @id @default(uuid()) @db.Uuid
+  requestKey    String   @unique @db.Uuid
+  plantId       String   @db.Uuid
+  kind          String
+  code          String
+  rootId        String   @db.Uuid
+  revision      Int
+  subjectId     String?  @db.Uuid
+  effectiveFrom DateTime
+  payload       Json
+  hash          String
+  evidence      String
+  status        String   @default("DRAFT")
+  makerId       String   @db.Uuid
+  attestedBy    String?  @db.Uuid
+  verifiedBy    String?  @db.Uuid
+  createdAt     DateTime @default(now())
+
+  @@unique([plantId, kind, code, revision])
+  @@index([plantId, kind, status, effectiveFrom])
+  @@index([rootId])
+}
+
+model StageRecord {
+  id                String   @id @default(uuid()) @db.Uuid
+  requestKey        String   @unique @db.Uuid
+  plantId           String   @db.Uuid
+  kind              String
+  effectiveAt       DateTime
+  configId          String   @db.Uuid
+  payload           Json
+  snapshot          Json
+  hash              String
+  number            String?  @unique
+  status            String   @default("DRAFT")
+  version           Int      @default(1)
+  makerId           String   @db.Uuid
+  verifiedBy        String?  @db.Uuid
+  issuedBy          String?  @db.Uuid
+  cancelRequestedBy String?  @db.Uuid
+  cancelReason      String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([plantId, kind, effectiveAt])
+}
+
+model AssetDepreciation {
+  id         String   @id @default(uuid()) @db.Uuid
+  plantId    String   @db.Uuid
+  assetId    String   @db.Uuid
+  configId   String   @db.Uuid
+  month      String
+  amount     Decimal  @db.Decimal(30, 6)
+  bookBefore Decimal  @db.Decimal(30, 6)
+  bookAfter  Decimal  @db.Decimal(30, 6)
+  snapshot   Json
+  status     String   @default("DRAFT")
+  version    Int      @default(1)
+  makerId    String   @db.Uuid
+  verifiedBy String?  @db.Uuid
+  postedBy   String?  @db.Uuid
+  createdAt  DateTime @default(now())
+
+  @@unique([assetId, month])
+  @@index([plantId, month, status])
+}
+
+model DepreciationEvent {
+  id           String   @id @default(uuid()) @db.Uuid
+  sourceId     String?  @unique @db.Uuid
+  correctionId String?  @unique @db.Uuid
+  plantId      String   @db.Uuid
+  assetId      String   @db.Uuid
+  effectiveAt  DateTime
+  amount       Decimal  @db.Decimal(30, 6)
+  actorId      String   @db.Uuid
+  createdAt    DateTime @default(now())
+
+  @@index([assetId, effectiveAt])
+}
+
+model DepreciationCorrection {
+  id          String   @id @default(uuid()) @db.Uuid
+  requestKey  String   @unique @db.Uuid
+  plantId     String   @db.Uuid
+  assetId     String   @db.Uuid
+  targetId    String   @db.Uuid
+  effectiveAt DateTime
+  amount      Decimal  @db.Decimal(30, 6)
+  reason      String
+  snapshot    Json
+  hash        String
+  status      String   @default("DRAFT")
+  version     Int      @default(1)
+  makerId     String   @db.Uuid
+  approvedBy  String?  @db.Uuid
+  createdAt   DateTime @default(now())
+
+  @@index([plantId, effectiveAt, status])
+  @@index([targetId])
+}
+
+model InspectionFinding {
+  id           String   @id @default(uuid()) @db.Uuid
+  inspectionId String   @db.Uuid
+  key          String
+  plantId      String   @db.Uuid
+  picId        String   @db.Uuid
+  detail       String
+  severity     String
+  dueDate      String
+  fileIds      String[] @db.Uuid
+  status       String   @default("OPEN")
+  resolvedBy   String?  @db.Uuid
+  version      Int      @default(1)
+
+  @@unique([inspectionId, key])
+  @@index([plantId, status])
+}
+
+model FindingFollowup {
+  id         String   @id @default(uuid()) @db.Uuid
+  requestKey String   @unique @db.Uuid
+  findingId  String   @db.Uuid
+  plantId    String   @db.Uuid
+  actualAt   DateTime
+  note       String
+  fileIds    String[] @db.Uuid
+  hash       String
+  status     String   @default("SUBMITTED")
+  makerId    String   @db.Uuid
+  verifiedBy String?  @db.Uuid
+  version    Int      @default(1)
+}
+
+model MedicalExam {
+  id          String   @id @default(uuid()) @db.Uuid
+  requestKey  String   @unique @db.Uuid
+  plantId     String   @db.Uuid
+  workerId    String   @db.Uuid
+  kind        String
+  examAt      DateTime
+  validUntil  DateTime
+  workStatus  String
+  measurements Json
+  notes       String
+  fileIds     String[] @db.Uuid
+  hash        String
+  status      String   @default("DRAFT")
+  version     Int      @default(1)
+  makerId     String   @db.Uuid
+  verifiedBy  String?  @db.Uuid
+  createdAt   DateTime @default(now())
+
+  @@index([plantId, workerId, examAt])
+}
+
+model StageFile {
+  id         String   @id @default(uuid()) @db.Uuid
+  requestKey String   @unique @db.Uuid
+  plantId    String   @db.Uuid
+  domain     String
+  ownerId    String   @db.Uuid
+  sourceId   String?  @db.Uuid
+  name       String
+  mime       String
+  size       Int
+  sha256     String
+  content    Bytes
+  createdAt  DateTime @default(now())
+
+  @@index([plantId, domain, sourceId])
+}

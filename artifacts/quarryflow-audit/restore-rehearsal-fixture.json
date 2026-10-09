@@ -1,0 +1,18 @@
+{
+  "label": "LOCAL FICTIONAL FIXTURE REHEARSAL; not production RPO/RTO sign-off",
+  "sourceSchema": "quarryflow_stage2_test_f65c3fab3adb402aaa3c72b3f289ebbe",
+  "ledgerCount": 1,
+  "depreciationEvents": 3,
+  "files": [
+    {
+      "id": "fd6fbfd2-f759-42e2-b00d-90181bf62f16",
+      "sha256": "291f3bfe51cdb8982d220b059ccc384671a74d54fd2e7ee0ce7af0ae2027a198"
+    },
+    {
+      "id": "8f09d8b9-3770-4676-8297-de2a6aa40554",
+      "sha256": "a25fa3547f8c45358e98dd036a2a0c2d41bace82552e50d073d235df4312fb33"
+    }
+  ],
+  "elapsedMs": 2020,
+  "result": "PASS"
+}
